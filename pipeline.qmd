@@ -90,7 +90,9 @@ plot_rtm <- function(date1 = "2024-01-01",
     filter(between(time, date1, date2)) |> 
     ggplot() +
     geom_line(aes(x = time, y = `$ Price Per MW`, color = name)) +
-    theme_minimal() 
+    theme_minimal() +
+    labs(color = "Type of Market") +
+    ggtitle(paste0("Day-Ahead Market and Real-Time Market between ", date1, " and ", date2))
   )
   
   return(x)
@@ -119,7 +121,9 @@ plot_lmp <- function(date1 = "2024-01-01",
     ggplot() +
     geom_line(aes(x = time, y = `$ Price Per MW`, color = name)) +
     facet_wrap(~NODE_ID) +
-    theme_minimal() 
+    theme_minimal() +
+    labs(color = "Type of Market") +
+    ggtitle("LMP")
   )
   
   return(x)
@@ -145,7 +149,9 @@ x <- ggplotly(
   filter(grepl(plant_name, Plant_Name, ignore.case = TRUE)) |> 
   filter(between(time, date1, date2)) |>
   ggplot(aes(x = time, y = `Temp (F)`)) +
-  geom_line()
+  geom_line() +
+  ggtitle(paste0("Temperature Data at ", plant_name)) +
+  theme_minimal()
 )
 
 return(x)
@@ -173,11 +179,11 @@ plot_plant_outage <- function(plant_name, date1 = "2024-01-01",
     ggplot(aes(x = `CURTAILMENT START DATE TIME`,
                y = Percent,
                color = `NATURE OF WORK`)) +
-    geom_segment(aes(xend = `CURTAILMENT END DATE TIME`, yend = Percent))
+    geom_segment(aes(xend = `CURTAILMENT END DATE TIME`, yend = Percent)) +
     labs(title = paste("Outages for", plant_name),
          x = "Start Date", y = "Curtailment %") +
     facet_wrap(~`OUTAGE TYPE`) +
-    theme_minimal()
+    theme_minimal() 
 
   return(ggplotly(plot))
 }
@@ -236,6 +242,8 @@ plot_exports <- function(date1 = "2024-01-01",
         ggplot(aes(x = day_of, y = value, color = name)) +
         geom_line() +
         theme_minimal() +
+        labs(xlab = "Date",
+             ylab = "MW") +
         ggtitle(paste0("Export and Import Overview between ", date1, " and ", date2))))
 
     print(
@@ -243,8 +251,13 @@ plot_exports <- function(date1 = "2024-01-01",
     mutate(`Export - Import` = interchange_mw) |>
     ggplot(aes(x = utc_time_at_end_of_hour, y = `Export - Import`,
                color = directly_interconnected_balancing_authority)) +
-    geom_smooth(se = FALSE) +
-    theme_minimal()))
+    labs(color = "Balancing Authority",
+         x = "Date",
+         y = "Export - Import (MW)") +
+    geom_smooth(formula = y ~ x,
+                method = "loess", se = FALSE) +
+    theme_minimal() +
+    ggtitle("Net Export - Import Across Balancing Authorities")))
 }
 
 plot_exports(date1 = "2024-01-01", date2 = "2024-02-01")
@@ -262,20 +275,21 @@ plot_forced_curtailment <- function(date1 = "2024-01-01",
   }
   
   
-outage_avg <- outage |>
-  filter(between(as.Date(`CURTAILMENT START DATE TIME`), date1, date2)) |>
-  filter(`OUTAGE TYPE` == "FORCED") |>
-  mutate(percent = `CURTAILMENT MW` / `RESOURCE PMAX MW`) |>
-  group_by(`RESOURCE NAME`) |>
-  dplyr::summarize(avg = mean(percent))
-
-print(outage_avg)
+  outage_avg <- outage |>
+    filter(between(as.Date(`CURTAILMENT START DATE TIME`), date1, date2)) |>
+    filter(`OUTAGE TYPE` == "FORCED") |>
+    mutate(percent = `CURTAILMENT MW` / `RESOURCE PMAX MW`) |>
+    group_by(`RESOURCE NAME`) |>
+    dplyr::summarize(avg = mean(percent))
 
   plot <- ggplotly(
-  outage_avg |>
-    left_join(unique(outage |> select(`RESOURCE NAME`, `RESOURCE PMAX MW`))) |>
-    ggplot(aes(x = `RESOURCE PMAX MW`, y = avg, group = `RESOURCE NAME`)) +
-    geom_point()
+    outage_avg |>
+      left_join(unique(outage |> select(`RESOURCE NAME`, `RESOURCE PMAX MW`)),
+                by = join_by("RESOURCE NAME")) |>
+      ggplot(aes(x = `RESOURCE PMAX MW`, y = avg, group = `RESOURCE NAME`)) +
+      geom_point() +
+      theme_minimal() +
+      ggtitle("Curtailment Percentage by Resource Capacity by Power Plant")
   )
   return(plot)
 }
@@ -283,10 +297,10 @@ print(outage_avg)
 plot_forced_curtailment(date1 = "2024-01-01", date2 = "2024-02-01")
 ```
 
-### plot_curtailment
+### plot_outage
 
 ```{r}
-plot_curtailment <- function(date1 = "2024-01-01",
+plot_outage <- function(date1 = "2024-01-01",
                      date2 = "2025-01-01",
                      percent_cutoff = 50) {
   date1 <- as_datetime(date1)
@@ -315,5 +329,5 @@ plot_curtailment <- function(date1 = "2024-01-01",
   return(ggplotly(plot))
 }
 
-plot_curtailment(date1 = "2024-01-01", date2 = "2024-02-01", percent_cutoff = 50)
+plot_outage(date1 = "2024-01-01", date2 = "2024-02-01", percent_cutoff = 50)
 ```
