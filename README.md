@@ -1,4 +1,4 @@
-Supporting functions to clean/get data is in data_collecting folder
+Supporting functions to clean/get data is in data_collecting folder <br>
 Full data used is on [Kaggle](https://www.kaggle.com/datasets/allenychoi/energy-market-data)
 
 Data:
