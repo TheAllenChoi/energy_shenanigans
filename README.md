@@ -1,4 +1,5 @@
 Supporting functions to clean/get data is in data_collecting folder
+Full data used is on [Kaggle](https://www.kaggle.com/datasets/allenychoi/energy-market-data)
 
 Data:
 - Interchange data was retrieved from [EIA](https://www.eia.gov/electricity/gridmonitor/dashboard/electric_overview/balancing_authority/CISO)
