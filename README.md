@@ -1,3 +1,5 @@
+Supporting functions to clean/get data is in data_collecting folder
+
 Data:
 - Interchange data was retrieved from [EIA](https://www.eia.gov/electricity/gridmonitor/dashboard/electric_overview/balancing_authority/CISO)
 - DAM/RTM data was retrieved from [OASIS](https://oasis.caiso.com/mrioasis/logon.do)
