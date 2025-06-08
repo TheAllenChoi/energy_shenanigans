@@ -331,3 +331,108 @@ plot_outage <- function(date1 = "2024-01-01",
 
 plot_outage(date1 = "2024-01-01", date2 = "2024-02-01", percent_cutoff = 50)
 ```
+### plot_days_out
+```{r}
+
+days_out <- function(date1 = "2024-01-01 00:00:00",
+                     date2 = "2024-12-31 23:59:59",
+                     reason = NA,
+                     percent_min = 0,
+                     mw_min = 0,
+                     num = 50) {
+  if (str_detect(date1, ":")) {
+    date1 <- as_datetime(date1)
+  } else {
+    date1 <- as_datetime(paste(date1, "00:00:00"))
+  }
+  if (str_detect(date2, ":")) {
+    date2 <- as_datetime(date2)
+  } else {
+    date2 <- as_datetime(paste(date2, "23:59:59"))
+  }
+
+ 
+  reason_list <- unique(outage$`NATURE OF WORK`)
+  if (date1 > date2) {
+    stop("date1 needs to be earlier than date 2")
+  }
+  if (!reason %in% reason_list & !is.na(reason)) {
+    stop("reason not cited in outages")
+  }
+ 
+
+  disjoint_sum <- function(start, end, points, pmax) {
+    breaks <- sort(unique(c(start, end)))
+    `CURTAILMENT START DATE TIME` <- head(breaks, -1)
+    `CURTAILMENT END DATE TIME` <- tail(breaks, -1)
+
+   
+    tibble(`CURTAILMENT START DATE TIME`, `CURTAILMENT END DATE TIME`) %>%
+      rowwise() %>%
+      mutate(`CURTAILMENT MW` = sum(points[start < `CURTAILMENT END DATE TIME` & end > `CURTAILMENT START DATE TIME`]),
+             `CURTAILMENT MW` = min(`CURTAILMENT MW`, pmax)) %>%
+      ungroup()
+
+  }
+
+  if (is.na(reason)) {
+  outage_clean <- outage |>
+  distinct() |>
+      mutate(percent = `CURTAILMENT MW` / `RESOURCE PMAX MW`,
+            `CURTAILMENT START DATE TIME` = as_datetime(`CURTAILMENT START DATE TIME`),
+            `CURTAILMENT END DATE TIME` = as_datetime(`CURTAILMENT END DATE TIME`),
+            `CURTAILMENT END DATE TIME` = if_else(`CURTAILMENT END DATE TIME` > as_datetime(date2), as_datetime(date2), `CURTAILMENT END DATE TIME`)) |>
+
+  filter(between(as.Date(`CURTAILMENT START DATE TIME`), as_datetime(date1), as_datetime(date2)) &
+               `CURTAILMENT MW` >= mw_min &
+               percent >= percent_min &
+          `OUTAGE TYPE` == "FORCED" )
+  } else {
+
+  outage_clean <- outage |>
+    distinct() |>
+      mutate(percent = `CURTAILMENT MW` / `RESOURCE PMAX MW`,
+            `CURTAILMENT START DATE TIME` = as_datetime(`CURTAILMENT START DATE TIME`),
+            `CURTAILMENT END DATE TIME` = as_datetime(`CURTAILMENT END DATE TIME`),
+            `CURTAILMENT END DATE TIME` = if_else(`CURTAILMENT END DATE TIME` > as_datetime(date2), as_datetime(date2), `CURTAILMENT END DATE TIME`)) |>
+
+  filter(between(as.Date(`CURTAILMENT START DATE TIME`), as_datetime(date1), as_datetime(date2)) &
+               `CURTAILMENT MW` >= mw_min &
+               percent >= percent_min &
+               `OUTAGE TYPE` == "FORCED" &
+               `NATURE OF WORK` == reason)
+
+  }
+
+  outage_resource_max <- outage_clean |>
+  group_by(`RESOURCE NAME`) |>
+  summarize(`RESOURCE PMAX MW` = max(`RESOURCE PMAX MW`)) |>
+  ungroup()
+
+ 
+result <- outage_clean %>%
+    group_by(`RESOURCE NAME`) %>%
+    group_modify(~ {
+      pmax <- max(.x$`RESOURCE PMAX MW`, na.rm = TRUE)
+      disjoint_sum(.x$`CURTAILMENT START DATE TIME`, .x$`CURTAILMENT END DATE TIME`, .x$`CURTAILMENT MW`, pmax)
+    }) %>%
+    ungroup() %>%
+    inner_join(outage_resource_max, by = "RESOURCE NAME") %>%
+    mutate(time_out = difftime(`CURTAILMENT END DATE TIME`, `CURTAILMENT START DATE TIME`, units = "days")) %>%
+    filter( `CURTAILMENT MW` >= mw_min) |>
+    group_by(`RESOURCE NAME`) %>%
+    mutate(prop_time_out = as.numeric(time_out)/sum(as.numeric(time_out))) %>%
+    summarize(time_out = round(sum(time_out), 2),
+              avg_curtailment = sum(`CURTAILMENT MW` * prop_time_out),
+              max_capacity = first(`RESOURCE PMAX MW`)) %>%
+    arrange(desc(time_out)) %>%
+    slice_max(time_out, n = num)
+
+return(result)
+
+
+}
+days_out()
+ 
+
+```
