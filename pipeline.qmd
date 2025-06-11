@@ -172,20 +172,32 @@ plot_plant_outage <- function(plant_name, date1 = "2024-01-01",
     stop("date1 needs to be earlier than date 2")
   }
   
+  outage <- outage |>
+    mutate(
+      `CURTAILMENT START DATE TIME` = as_datetime(`CURTAILMENT START DATE TIME`),
+      `CURTAILMENT END DATE TIME` = as_datetime(`CURTAILMENT END DATE TIME`)
+    )
+  
   plot <- outage |>
     filter(grepl(plant_name, `RESOURCE NAME`, ignore.case = TRUE)) |>
-    filter(between(as.Date(`CURTAILMENT START DATE TIME`), date1, date2)) |> 
+    filter(between(`CURTAILMENT START DATE TIME`, date1, date2)) |>
+    filter(`OUTAGE TYPE` == "FORCED") |>
     mutate(Percent = (`CURTAILMENT MW` / `RESOURCE PMAX MW`) * 100) |>
-    ggplot(aes(x = `CURTAILMENT START DATE TIME`,
-               y = Percent,
+    ggplot(aes(x = `CURTAILMENT START DATE TIME`, 
+               y = `CURTAILMENT MW`,
                color = `NATURE OF WORK`)) +
-    geom_segment(aes(xend = `CURTAILMENT END DATE TIME`, yend = Percent)) +
-    labs(title = paste("Outages for", plant_name),
-         x = "Start Date", y = "Curtailment %") +
-    facet_wrap(~`OUTAGE TYPE`) +
-    theme_minimal() 
+    geom_segment(aes(xend = `CURTAILMENT END DATE TIME`, yend = `CURTAILMENT MW`)) +
+    labs(title = paste("Forced Outages for", plant_name),
+         x = "Start Date", y = "Curtailment MW") +
+    theme_minimal() +
+    scale_x_datetime(
+      breaks = seq(as.POSIXct("2024-01-01"), as.POSIXct("2024-12-01"), by = "1 month"),
+      date_labels = "%b"
+    ) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
   return(ggplotly(plot))
+
 }
 
 plot_plant_outage(plant_name = "El Segundo", date1 = "2024-01-01", date2 = "2024-02-01")
@@ -331,7 +343,9 @@ plot_outage <- function(date1 = "2024-01-01",
 
 plot_outage(date1 = "2024-01-01", date2 = "2024-02-01", percent_cutoff = 50)
 ```
+
 ### plot_days_out
+
 ```{r}
 
 days_out <- function(date1 = "2024-01-01 00:00:00",
